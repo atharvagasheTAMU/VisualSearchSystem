@@ -1,0 +1,72 @@
+project:
+  name: PinterestDemo
+  version: "1.0"
+
+paths:
+  data_root: data
+  raw_images: data/raw
+  processed_images: data/processed
+  embeddings_dir: data/embeddings
+  metadata_dir: data/metadata
+  eval_dir: data/eval
+  index_path: data/embeddings/faiss.index
+  embeddings_path: data/embeddings/embeddings.npy
+  id_map_path: data/embeddings/id_map.json
+  metadata_csv: data/metadata/images.csv
+  results_dir: results
+
+dataset:
+  name: fashion-product-images-small
+  kaggle_dataset: paramaggarwal/fashion-product-images-small
+  image_size: 224
+
+model:
+  clip_model: openai/clip-vit-base-patch32
+  blip_model: Salesforce/blip-image-captioning-base
+  device: auto  # auto, cpu, cuda
+  batch_size: 64
+
+retrieval:
+  top_k: 10
+  candidate_pool: 50
+  index_type: flat  # flat, ivf
+  ivf_nlist: 100
+  metric: cosine
+
+reranking:
+  weights:
+    visual_similarity: 0.55
+    caption_similarity: 0.15
+    metadata_match: 0.10
+    geo_proximity: 0.10
+    entity_tag_match: 0.05
+    topic_trend: 0.05
+  metadata_weights:
+    category: 0.15
+    color: 0.05
+
+evaluation:
+  eval_set_size: 200
+  k_values: [5, 10, 20]
+
+api:
+  host: 0.0.0.0
+  port: 8000
+  reload: true
+
+geonames:
+  base_url: http://api.geonames.org
+  max_rows: 1
+
+reddit:
+  subreddits:
+    - fashion
+    - travel
+    - streetwear
+    - malefashionadvice
+    - femalefashionadvice
+    - travel
+    - architecture
+    - food
+    - sports
+  posts_per_subreddit: 100

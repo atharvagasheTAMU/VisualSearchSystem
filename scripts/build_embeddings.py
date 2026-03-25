@@ -43,6 +43,7 @@ def build_embeddings(config: dict) -> None:
     all_embeddings = []
     id_map = {}
     failed = []
+    global_idx = 0  # running count of successfully encoded images
 
     paths = df["path"].tolist()
     image_ids = df["image_id"].tolist()
@@ -67,7 +68,7 @@ def build_embeddings(config: dict) -> None:
         except Exception as e:
             print(f"  Batch failed ({e}), falling back to single-image encoding ...")
             embeddings = []
-            for p, img_id in zip(valid_paths, valid_ids):
+            for p, img_id in zip(valid_paths, list(valid_ids)):
                 try:
                     emb = encoder.encode_image(p)
                     embeddings.append(emb)
@@ -80,9 +81,9 @@ def build_embeddings(config: dict) -> None:
             embeddings = np.stack(embeddings)
 
         for i, img_id in enumerate(valid_ids):
-            idx = len(all_embeddings) + i
-            id_map[str(idx)] = int(img_id)
+            id_map[str(global_idx + i)] = int(img_id)
 
+        global_idx += len(valid_ids)
         all_embeddings.append(embeddings)
 
     final_embeddings = np.vstack(all_embeddings).astype(np.float32)

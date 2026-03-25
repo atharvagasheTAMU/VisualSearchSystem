@@ -42,7 +42,9 @@ reranking:
     entity_tag_match: 0.05
     topic_trend: 0.05
   metadata_weights:
-    category: 0.15
+    article_type: 0.20
+    sub_category: 0.10
+    category: 0.05
     color: 0.05
 
 evaluation:

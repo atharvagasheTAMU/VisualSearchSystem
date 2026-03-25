@@ -11,24 +11,45 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
 class MetadataReranker:
     def __init__(self, config: dict):
         weights = config["reranking"]["metadata_weights"]
-        self.category_weight = weights.get("category", 0.15)
+        self.article_type_weight = weights.get("article_type", 0.20)
+        self.sub_category_weight = weights.get("sub_category", 0.10)
+        self.category_weight = weights.get("category", 0.05)
         self.color_weight = weights.get("color", 0.05)
         self.visual_weight = config["reranking"]["weights"].get("visual_similarity", 0.80)
 
-    def _metadata_score(self, query_result: dict, candidate: dict) -> float:
+    def _metadata_score(self, query_meta: dict, candidate: dict) -> float:
         """Compute metadata match score between query metadata and a candidate."""
         score = 0.0
+
+        # article_type is the most specific signal (e.g. "Tshirts", "Casual Shoes")
         if (
-            query_result.get("category")
+            query_meta.get("article_type")
+            and candidate.get("article_type")
+            and query_meta["article_type"] == candidate["article_type"]
+        ):
+            score += self.article_type_weight
+
+        # sub_category is a medium-specificity signal (e.g. "Topwear", "Shoes")
+        if (
+            query_meta.get("sub_category")
+            and candidate.get("sub_category")
+            and query_meta["sub_category"] == candidate["sub_category"]
+        ):
+            score += self.sub_category_weight
+
+        # masterCategory is a broad signal — only add if neither above matched
+        if (
+            score == 0.0
+            and query_meta.get("category")
             and candidate.get("category")
-            and query_result["category"] == candidate["category"]
+            and query_meta["category"] == candidate["category"]
         ):
             score += self.category_weight
 
         if (
-            query_result.get("color")
+            query_meta.get("color")
             and candidate.get("color")
-            and query_result["color"].lower() == candidate["color"].lower()
+            and query_meta["color"].lower() == candidate["color"].lower()
         ):
             score += self.color_weight
 

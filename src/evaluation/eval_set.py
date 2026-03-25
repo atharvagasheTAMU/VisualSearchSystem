@@ -1,12 +1,15 @@
 """
 Build and manage the evaluation set.
 
-Relevance definition (Phase 1 baseline):
-  - An image is relevant to a query if it shares the same `category`
-    (masterCategory in the Kaggle fashion dataset).
+Relevance definition:
+  - An image is relevant to a query if it shares the same `article_type`
+    (e.g. "Tshirts", "Casual Shoes", "Watches") from the Kaggle fashion dataset.
+  - article_type is much more specific than masterCategory and produces
+    relevant sets of 50-300 items, making Recall/mAP/nDCG meaningful.
+  - Relevant set is capped at MAX_RELEVANT to keep recall denominators tractable.
 
 The eval set is stored as data/eval/eval_queries.csv with columns:
-  query_image_id, relevant_image_ids (pipe-separated)
+  query_image_id, relevant_image_ids (pipe-separated), article_type, n_relevant
 """
 
 from pathlib import Path
@@ -14,6 +17,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+
+MAX_RELEVANT = 200  # cap relevant set size so recall denominators stay tractable
 
 
 def load_config(config_path: str = "configs/config.yaml") -> dict:
@@ -27,7 +32,7 @@ def build_eval_set(
     seed: int = 42,
 ) -> pd.DataFrame:
     """
-    Sample n_queries images and define relevant set for each.
+    Sample n_queries images and define relevant set for each using article_type.
 
     Saves to data/eval/eval_queries.csv.
     Returns the eval DataFrame.
@@ -40,43 +45,65 @@ def build_eval_set(
     df = pd.read_csv(metadata_csv)
     df["image_id"] = df["image_id"].astype(int)
 
-    # Sample query images, stratified by category
+    # Use article_type as relevance (specific: "Tshirts", "Casual Shoes", etc.)
+    # Fall back to sub_category, then category if article_type is absent
+    if "article_type" in df.columns and df["article_type"].notna().sum() > 0:
+        relevance_col = "article_type"
+    elif "sub_category" in df.columns and df["sub_category"].notna().sum() > 0:
+        relevance_col = "sub_category"
+    else:
+        relevance_col = "category"
+
+    print(f"Using '{relevance_col}' as relevance column.")
+
     rng = np.random.default_rng(seed)
-    categories = df["category"].dropna().unique()
+    groups = df[relevance_col].dropna().unique()
+
+    # Only use groups with at least 5 items so there are meaningful relevant sets
+    valid_groups = [g for g in groups if len(df[df[relevance_col] == g]) >= 5]
     queries = []
 
-    per_cat = max(1, n_queries // len(categories))
-    for cat in categories:
-        cat_df = df[df["category"] == cat]
-        sample_n = min(per_cat, len(cat_df))
-        sampled = cat_df.sample(n=sample_n, random_state=int(rng.integers(0, 1_000_000)))
+    per_group = max(1, n_queries // len(valid_groups))
+    for grp in valid_groups:
+        grp_df = df[df[relevance_col] == grp]
+        sample_n = min(per_group, len(grp_df))
+        sampled = grp_df.sample(n=sample_n, random_state=int(rng.integers(0, 1_000_000)))
         queries.append(sampled)
 
-    query_df = pd.concat(queries).sample(n=min(n_queries, len(pd.concat(queries))), random_state=seed).reset_index(drop=True)
+    query_df = pd.concat(queries).sample(
+        n=min(n_queries, len(pd.concat(queries))), random_state=seed
+    ).reset_index(drop=True)
 
-    # Build relevance sets
-    cat_to_ids: dict[str, list[int]] = {}
-    for cat in categories:
-        cat_to_ids[cat] = df[df["category"] == cat]["image_id"].tolist()
+    # Build relevance sets — cap at MAX_RELEVANT to keep recall denominators tractable
+    grp_to_ids: dict[str, list[int]] = {}
+    for grp in valid_groups:
+        all_ids = df[df[relevance_col] == grp]["image_id"].tolist()
+        grp_to_ids[grp] = all_ids
 
     rows = []
     for _, row in query_df.iterrows():
         qid = int(row["image_id"])
-        cat = row.get("category")
-        if cat and cat in cat_to_ids:
-            relevant = [iid for iid in cat_to_ids[cat] if iid != qid]
+        grp = row.get(relevance_col)
+        if grp and grp in grp_to_ids:
+            candidates = [iid for iid in grp_to_ids[grp] if iid != qid]
+            rng2 = np.random.default_rng(seed + qid)
+            if len(candidates) > MAX_RELEVANT:
+                candidates = rng2.choice(candidates, MAX_RELEVANT, replace=False).tolist()
         else:
-            relevant = []
+            candidates = []
         rows.append({
             "query_image_id": qid,
-            "category": cat,
-            "relevant_image_ids": "|".join(str(i) for i in relevant),
-            "n_relevant": len(relevant),
+            "category": row.get("category", ""),
+            "article_type": grp,
+            "relevant_image_ids": "|".join(str(i) for i in candidates),
+            "n_relevant": len(candidates),
         })
 
     eval_df = pd.DataFrame(rows)
     eval_df.to_csv(output_path, index=False)
-    print(f"Eval set saved: {len(eval_df)} queries -> {output_path}")
+    print(f"Eval set saved: {len(eval_df)} queries, relevance='{relevance_col}' -> {output_path}")
+    print(f"  Avg relevant per query: {eval_df['n_relevant'].mean():.1f}")
+    print(f"  Min/Max relevant: {eval_df['n_relevant'].min()} / {eval_df['n_relevant'].max()}")
     return eval_df
 
 
@@ -102,6 +129,7 @@ def load_eval_set(config: dict) -> list[dict]:
         result.append({
             "query_image_id": int(row["query_image_id"]),
             "category": row.get("category"),
+            "article_type": row.get("article_type"),
             "relevant": relevant,
         })
     return result

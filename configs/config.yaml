@@ -22,7 +22,7 @@ datasets:
     loader: fashion
     category: Apparel
   - name: landmarks
-    kaggle_slug: vishnupriyavr/wiki-landmarks-dataset
+    kaggle_slug: gpiosenka/landmark-recognition
     raw_dir: data/raw/landmarks
     loader: folder
     category: Landmark

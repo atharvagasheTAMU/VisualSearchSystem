@@ -15,10 +15,24 @@ paths:
   metadata_csv: data/metadata/images.csv
   results_dir: results
 
-dataset:
-  name: fashion-product-images-small
-  kaggle_dataset: paramaggarwal/fashion-product-images-small
-  image_size: 224
+datasets:
+  - name: fashion
+    kaggle_slug: paramaggarwal/fashion-product-images-small
+    raw_dir: data/raw/fashion
+    loader: fashion
+    category: Apparel
+  - name: landmarks
+    kaggle_slug: vishnupriyavr/wiki-landmarks-dataset
+    raw_dir: data/raw/landmarks
+    loader: folder
+    category: Landmark
+  - name: food
+    kaggle_slug: dansbecker/food-101
+    raw_dir: data/raw/food
+    loader: folder
+    category: Food
+
+image_size: 224
 
 model:
   clip_model: openai/clip-vit-base-patch32

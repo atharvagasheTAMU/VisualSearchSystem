@@ -37,7 +37,7 @@ def main() -> None:
 
     if not args.skip_download:
         print("\n" + "="*60)
-        print("STEP 1: Downloading dataset")
+        print("STEP 1: Downloading datasets")
         print("="*60)
         from src.ingestion.download import download_dataset
         download_dataset(config)
@@ -48,8 +48,8 @@ def main() -> None:
         print("\n" + "="*60)
         print("STEP 2: Cleaning data -> images.csv")
         print("="*60)
-        from src.preprocessing.clean import clean_dataset
-        clean_dataset(config)
+        from src.preprocessing.clean import clean_all_datasets
+        clean_all_datasets(config)
     else:
         print("Skipping data cleaning.")
 

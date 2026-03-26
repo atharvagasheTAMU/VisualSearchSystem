@@ -109,39 +109,39 @@ def clean_fashion_dataset(raw_dir: Path) -> pd.DataFrame:
 # ── Folder-based dataset loader ───────────────────────────────────────────────
 
 def clean_folder_dataset(raw_dir: Path, category: str) -> pd.DataFrame:
-    """Load a class-folder dataset (class_name/image.jpg layout).
+    """Load a class-folder dataset of any nesting depth.
 
-    Sets:
-      category     = the top-level category label passed in (e.g. "Landmark", "Food")
-      article_type = the class subfolder name (e.g. "Eiffel_Tower", "pizza")
-      product_name = article_type with underscores replaced by spaces
+    Finds every image recursively via rglob; uses each image's immediate
+    parent directory name as the class (article_type).  Works for:
+      - <class>/<image>.jpg          (1 level, e.g. Wonders of the World)
+      - root/images/<class>/<img>    (2 levels, e.g. Food-101)
+      - root/root/<class>/<img>      (2 levels, e.g. Intel Image Classification)
     """
     image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
+
+    all_images = [
+        p for p in raw_dir.rglob("*")
+        if p.is_file() and p.suffix.lower() in image_extensions
+    ]
+
+    if not all_images:
+        print(f"  [{category.lower()}] No images found under {raw_dir}")
+        return pd.DataFrame()
+
     valid_rows = []
     skipped = 0
 
-    # Walk one level of subdirectories — each is a class
-    class_dirs = sorted([d for d in raw_dir.iterdir() if d.is_dir()])
-    if not class_dirs:
-        # Flat layout fallback: images directly in raw_dir
-        class_dirs = [raw_dir]
-
-    for class_dir in tqdm(class_dirs, desc=f"  [{category.lower()}] Scanning classes"):
-        class_name = class_dir.name
-        product_name = class_name.replace("_", " ").replace("-", " ").title()
-
-        for img_path in class_dir.iterdir():
-            if img_path.suffix.lower() not in image_extensions:
-                continue
-            if not is_valid_image(img_path):
-                skipped += 1
-                continue
-            valid_rows.append({
-                "path": str(img_path),
-                "category": category,
-                "article_type": class_name,
-                "product_name": product_name,
-            })
+    for img_path in tqdm(all_images, desc=f"  [{category.lower()}] Validating"):
+        if not is_valid_image(img_path):
+            skipped += 1
+            continue
+        class_name = img_path.parent.name
+        valid_rows.append({
+            "path":         str(img_path),
+            "category":     category,
+            "article_type": class_name,
+            "product_name": class_name.replace("_", " ").replace("-", " ").title(),
+        })
 
     print(f"  [{category.lower()}] {len(valid_rows):,} valid  |  {skipped:,} skipped")
     return pd.DataFrame(valid_rows)

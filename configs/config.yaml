@@ -21,11 +21,12 @@ datasets:
     raw_dir: data/raw/fashion
     loader: fashion
     category: Apparel
-  - name: landmarks
-    kaggle_slug: gpiosenka/landmark-recognition
-    raw_dir: data/raw/landmarks
-    loader: folder
-    category: Landmark
+  # Landmarks is optional — uncomment and set kaggle_slug once you have access
+  # - name: landmarks
+  #   kaggle_slug: owner/dataset-name
+  #   raw_dir: data/raw/landmarks
+  #   loader: folder
+  #   category: Landmark
   - name: food
     kaggle_slug: dansbecker/food-101
     raw_dir: data/raw/food
